@@ -1,0 +1,29 @@
+{
+  "name": "htb-discord-bot",
+  "version": "0.1.0",
+  "description": "Discord bot that links server members to Hack The Box accounts and shows a per-guild XP leaderboard",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy-commands": "node src/deploy-commands.js",
+    "install-browser": "npx playwright install chrome"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "discord",
+    "discord-bot",
+    "hackthebox",
+    "htb",
+    "leaderboard"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "playwright": "^1.49.0"
+  }
+}
