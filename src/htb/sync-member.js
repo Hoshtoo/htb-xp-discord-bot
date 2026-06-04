@@ -1,7 +1,8 @@
 import { upsertMember, updateMemberXp } from '../db.js';
 import { captureForMember } from './capture.js';
-import { HtbResolveError, resolveHtbUser } from './resolve.js';
 import { fetchExperiencePublic } from './experience.js';
+import { recordMemberXp } from './record-xp.js';
+import { HtbResolveError, resolveHtbUser } from './resolve.js';
 
 /**
  * Resolve HTB user, capture profile APIs, and upsert guild member row.
@@ -46,6 +47,10 @@ export async function linkMember({
     last_synced_at: now,
   });
 
+  if (parsed.totalExperiencePoints != null) {
+    recordMemberXp(guildId, discordUser.id, parsed.totalExperiencePoints, new Date(now));
+  }
+
   return {
     htbUsername: resolved.name,
     htbUserId: resolved.id,
@@ -71,6 +76,15 @@ export async function syncMemberXp(memberRow) {
     xp.totalExperiencePoints,
     now
   );
+
+  if (xp.totalExperiencePoints != null) {
+    recordMemberXp(
+      memberRow.guild_id,
+      memberRow.discord_user_id,
+      xp.totalExperiencePoints,
+      new Date(now)
+    );
+  }
 
   return {
     htbUsername: memberRow.htb_username,

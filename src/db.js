@@ -16,7 +16,19 @@ CREATE TABLE IF NOT EXISTS members (
   PRIMARY KEY (guild_id, discord_user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_members_guild ON members(guild_id);
+
+CREATE TABLE IF NOT EXISTS xp_snapshots (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id        TEXT NOT NULL,
+  discord_user_id TEXT NOT NULL,
+  total_xp        INTEGER NOT NULL,
+  captured_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_xp_snapshots_period
+  ON xp_snapshots (guild_id, discord_user_id, captured_at);
 `;
+
+const SNAPSHOT_RETENTION_DAYS = 90;
 
 let db;
 
@@ -58,7 +70,11 @@ export function getMember(guildId, discordUserId) {
 }
 
 export function deleteMember(guildId, discordUserId) {
-  return getDb()
+  const database = getDb();
+  database
+    .prepare('DELETE FROM xp_snapshots WHERE guild_id = ? AND discord_user_id = ?')
+    .run(guildId, discordUserId);
+  return database
     .prepare('DELETE FROM members WHERE guild_id = ? AND discord_user_id = ?')
     .run(guildId, discordUserId);
 }
@@ -75,4 +91,55 @@ export function updateMemberXp(guildId, discordUserId, lastXp, lastSyncedAt) {
       'UPDATE members SET last_xp = ?, last_synced_at = ? WHERE guild_id = ? AND discord_user_id = ?'
     )
     .run(lastXp, lastSyncedAt, guildId, discordUserId);
+}
+
+export function getLatestSnapshot(guildId, discordUserId) {
+  return getDb()
+    .prepare(
+      `SELECT total_xp, captured_at FROM xp_snapshots
+       WHERE guild_id = ? AND discord_user_id = ?
+       ORDER BY captured_at DESC LIMIT 1`
+    )
+    .get(guildId, discordUserId);
+}
+
+export function insertXpSnapshot(guildId, discordUserId, totalXp, capturedAt) {
+  return getDb()
+    .prepare(
+      `INSERT INTO xp_snapshots (guild_id, discord_user_id, total_xp, captured_at)
+       VALUES (?, ?, ?, ?)`
+    )
+    .run(guildId, discordUserId, totalXp, capturedAt);
+}
+
+export function getBaselineXp(guildId, discordUserId, periodStartIso) {
+  const row = getDb()
+    .prepare(
+      `SELECT total_xp FROM xp_snapshots
+       WHERE guild_id = ? AND discord_user_id = ? AND captured_at <= ?
+       ORDER BY captured_at DESC LIMIT 1`
+    )
+    .get(guildId, discordUserId, periodStartIso);
+  return row?.total_xp ?? null;
+}
+
+export function getFirstSnapshotInPeriod(guildId, discordUserId, periodStartIso, periodEndIso) {
+  const row = getDb()
+    .prepare(
+      `SELECT total_xp FROM xp_snapshots
+       WHERE guild_id = ? AND discord_user_id = ?
+         AND captured_at > ? AND captured_at <= ?
+       ORDER BY captured_at ASC LIMIT 1`
+    )
+    .get(guildId, discordUserId, periodStartIso, periodEndIso);
+  return row?.total_xp ?? null;
+}
+
+export function pruneSnapshots() {
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - SNAPSHOT_RETENTION_DAYS);
+  const cutoffIso = cutoff.toISOString();
+  return getDb()
+    .prepare('DELETE FROM xp_snapshots WHERE captured_at < ?')
+    .run(cutoffIso);
 }

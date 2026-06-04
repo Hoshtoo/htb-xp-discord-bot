@@ -6,9 +6,9 @@ A Discord bot that links server members to [Hack The Box](https://www.hackthebox
 
 - **`/link`** — Associate a Discord member with an HTB username (or numeric user ID)
 - **`/sync`** — Refresh XP for linked members from stored HTB Experience API URLs
-- **`/leaderboard`** — Rank linked members by total HTB experience points
+- **`/leaderboard`** — All-time, weekly, or monthly XP rankings (per-server)
 - **`/unlink`** — Remove a member's link
-- Per-guild SQLite storage (no external database required)
+- Per-guild SQLite storage with XP snapshot history (no external database required)
 - Username resolution via HTB search API (no need to look up numeric IDs manually)
 
 ## How it works
@@ -17,6 +17,7 @@ A Discord bot that links server members to [Hack The Box](https://www.hackthebox
 |------|----------------|
 | **Link** | Resolves HTB user → runs headless Chrome (Playwright) to capture profile API calls → stores the Experience v1 URL (`/api/experience/v1/account/{uuid}`) |
 | **Sync / Leaderboard** | Fetches XP from stored URLs directly (public Experience API, no browser) |
+| **XP history** | Each sync/leaderboard/link records a snapshot; weekly/monthly boards compare current total vs period start |
 
 `/link` is the only command that uses Playwright. It requires a valid `HTB_TOKEN` and Chrome installed on the host.
 
@@ -177,6 +178,28 @@ Refresh XP for linked members using stored Experience API URLs (fast, no browser
 
 Fetch current XP for all linked members and post a ranked embed (top 10 shown).
 
+| Option | Description |
+|--------|-------------|
+| `period` | Optional — `All time` (default), `This week`, or `This month` |
+
+Examples:
+
+```
+/leaderboard
+/leaderboard period:This week
+/leaderboard period:This month
+```
+
+**Period boundaries (UTC):**
+
+- **This week** — Monday 00:00 UTC through now (ISO week)
+- **This month** — 1st of the calendar month 00:00 UTC through now
+- **All time** — Lifetime HTB XP total
+
+Period leaderboards show **XP gained during that period** (current total minus baseline at period start). Run `/sync` regularly so snapshots stay accurate.
+
+**Tracking caveat:** HTB only exposes lifetime XP. The bot records snapshots when you `/link`, `/sync`, or run `/leaderboard`. If no snapshot exists from before the period started, rankings use the first in-period snapshot as the baseline—so early weekly/monthly boards may undercount until history builds up.
+
 ### `/unlink`
 
 Remove a member’s HTB link from this server.
@@ -199,7 +222,8 @@ htb-discord-bot/
 │   ├── config.js
 │   ├── db.js                    # SQLite schema & queries
 │   ├── commands/                # Slash command handlers
-│   └── htb/                     # HTB API + capture logic
+│   ├── leaderboard/             # Ranking + period delta logic
+│   └── htb/                     # HTB API, capture, snapshots
 ├── .env.example
 ├── package.json
 └── README.md
@@ -207,7 +231,7 @@ htb-discord-bot/
 
 Data created at runtime (gitignored):
 
-- `data/bot.db` — member links and cached XP
+- `data/bot.db` — member links, cached XP, and `xp_snapshots` history (90-day retention)
 - `data/captures/` — temporary Playwright output (deleted after `/link`)
 
 ---
@@ -246,7 +270,8 @@ Outputs: `profile.html`, `profile.png`, `profile.txt`, `api-captures.json`.
 | `HTB user "…" not found` | Check spelling; try numeric HTB user ID from profile URL |
 | `no account_id` on link | HTB profile may be private; use a token that can view the profile |
 | `Experience API failed` on sync | Re-run `/link` for that member to refresh the stored URL |
-| Bot online but commands missing | Re-invite with `applications.commands` scope |
+| Weekly/monthly board empty or low | Run `/sync` to record snapshots; period boards need history since period start |
+| Bot online but commands missing | Re-invite with `applications.commands` scope; run `npm run deploy-commands` after updates |
 
 ---
 

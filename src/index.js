@@ -5,13 +5,14 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { config } from './config.js';
-import { getDb } from './db.js';
+import { getDb, pruneSnapshots } from './db.js';
 import { handleLink } from './commands/link.js';
 import { handleUnlink } from './commands/unlink.js';
 import { handleSync } from './commands/sync.js';
 import { handleLeaderboard } from './commands/leaderboard.js';
 
 getDb();
+pruneSnapshots();
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],

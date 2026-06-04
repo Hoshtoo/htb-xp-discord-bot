@@ -27,5 +27,15 @@ export const commandDefinitions = [
     ),
   new SlashCommandBuilder()
     .setName('leaderboard')
-    .setDescription('Show HTB XP leaderboard for linked members in this server'),
+    .setDescription('Show HTB XP leaderboard for linked members in this server')
+    .addStringOption((opt) =>
+      opt
+        .setName('period')
+        .setDescription('Leaderboard time range')
+        .addChoices(
+          { name: 'All time', value: 'all' },
+          { name: 'This week', value: 'weekly' },
+          { name: 'This month', value: 'monthly' }
+        )
+    ),
 ].map((c) => c.toJSON());
