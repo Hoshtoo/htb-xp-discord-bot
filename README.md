@@ -43,7 +43,7 @@ npm run deploy-commands
 npm start
 ```
 
-Invite the bot to your server (see [Invite the bot](#invite-the-bot)), then run `/link` in a channel.
+Invite the bot to your server (see [Invite the bot](#6-invite-the-bot)), then run `/link` in a channel.
 
 ---
 
