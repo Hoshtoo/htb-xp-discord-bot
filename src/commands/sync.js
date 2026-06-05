@@ -3,7 +3,6 @@ import { syncMemberXp } from '../htb/sync-member.js';
 
 export async function handleSync(interaction) {
   const targetUser = interaction.options.getUser('member');
-  await interaction.deferReply();
 
   const members = targetUser
     ? listGuildMembers(interaction.guildId).filter(

@@ -2,8 +2,10 @@ import {
   getBaselineXp,
   getFirstSnapshotInPeriod,
   listGuildMembers,
+  updateMemberDisplayNames,
   updateMemberXp,
 } from '../db.js';
+import { resolveGuildDisplayNames } from '../discord/display-name.js';
 import { fetchAllExperience } from '../htb/experience.js';
 import { getPeriodBounds, getPeriodXpSuffix } from '../htb/periods.js';
 import { recordMemberXp } from '../htb/record-xp.js';
@@ -17,14 +19,35 @@ function formatRank(n) {
   return `#${n}`;
 }
 
+function tagFor(member, displayNames) {
+  const live = displayNames.get(member.discord_user_id);
+  if (live) return live;
+  return member.server_nick ?? member.discord_tag ?? 'Unknown';
+}
+
 /**
  * @param {string} guildId
+ * @param {import('discord.js').Client} client
  * @param {'all' | 'weekly' | 'monthly'} period
+ * @param {import('discord.js').Guild | null} [guild]
  */
-export async function buildGuildRanking(guildId, period = 'all') {
+export async function buildGuildRanking(guildId, client, period = 'all', guild = null) {
+  if (!guildId) {
+    throw new Error('guildId is required to build leaderboard');
+  }
+
   const members = listGuildMembers(guildId);
   if (members.length === 0) {
     return { empty: true, period, bounds: getPeriodBounds(period) };
+  }
+
+  const displayNames = await resolveGuildDisplayNames(client, guildId, members, guild);
+  for (const m of members) {
+    const name = displayNames.get(m.discord_user_id);
+    if (!name) continue;
+    if (name !== m.discord_tag || name !== m.server_nick) {
+      updateMemberDisplayNames(guildId, m.discord_user_id, name, name);
+    }
   }
 
   const withUrl = members.filter((m) => m.experience_url);
@@ -52,7 +75,7 @@ export async function buildGuildRanking(guildId, period = 'all') {
     if (!r.ok || r.totalExperiencePoints == null) {
       ranked.push({
         rank: null,
-        tag: r.member.discord_tag,
+        tag: tagFor(r.member, displayNames),
         htb: r.member.htb_username,
         displayXp: null,
         error: r.error,
@@ -93,7 +116,7 @@ export async function buildGuildRanking(guildId, period = 'all') {
 
     ranked.push({
       rank: null,
-      tag: r.member.discord_tag,
+      tag: tagFor(r.member, displayNames),
       htb: r.member.htb_username,
       displayXp: metric,
       level: r.level,
@@ -107,7 +130,7 @@ export async function buildGuildRanking(guildId, period = 'all') {
   for (const m of noUrl) {
     ranked.push({
       rank: null,
-      tag: m.discord_tag,
+      tag: tagFor(m, displayNames),
       htb: m.htb_username,
       displayXp: null,
       error: 'no experience URL',

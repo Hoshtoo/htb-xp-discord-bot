@@ -32,12 +32,21 @@ const SNAPSHOT_RETENTION_DAYS = 90;
 
 let db;
 
+function migrateMembersTable(database) {
+  const columns = database.prepare('PRAGMA table_info(members)').all();
+  if (!columns.some((c) => c.name === 'server_nick')) {
+    database.exec('ALTER TABLE members ADD COLUMN server_nick TEXT');
+    console.log('Database migration: added members.server_nick column');
+  }
+}
+
 export function getDb() {
   if (!db) {
     const path = process.env.DATABASE_PATH || './data/bot.db';
     mkdirSync(dirname(path), { recursive: true });
     db = new Database(path);
     db.exec(SCHEMA);
+    migrateMembersTable(db);
   }
   return db;
 }
@@ -45,14 +54,15 @@ export function getDb() {
 export function upsertMember(row) {
   const stmt = getDb().prepare(`
     INSERT INTO members (
-      guild_id, discord_user_id, discord_tag, htb_username,
+      guild_id, discord_user_id, discord_tag, server_nick, htb_username,
       htb_user_id, htb_account_id, experience_url, last_xp, last_synced_at
     ) VALUES (
-      @guild_id, @discord_user_id, @discord_tag, @htb_username,
+      @guild_id, @discord_user_id, @discord_tag, @server_nick, @htb_username,
       @htb_user_id, @htb_account_id, @experience_url, @last_xp, @last_synced_at
     )
     ON CONFLICT (guild_id, discord_user_id) DO UPDATE SET
       discord_tag = excluded.discord_tag,
+      server_nick = excluded.server_nick,
       htb_username = excluded.htb_username,
       htb_user_id = excluded.htb_user_id,
       htb_account_id = excluded.htb_account_id,
@@ -91,6 +101,28 @@ export function updateMemberXp(guildId, discordUserId, lastXp, lastSyncedAt) {
       'UPDATE members SET last_xp = ?, last_synced_at = ? WHERE guild_id = ? AND discord_user_id = ?'
     )
     .run(lastXp, lastSyncedAt, guildId, discordUserId);
+}
+
+export function updateMemberDiscordTag(guildId, discordUserId, discordTag) {
+  return getDb()
+    .prepare(
+      'UPDATE members SET discord_tag = ? WHERE guild_id = ? AND discord_user_id = ?'
+    )
+    .run(discordTag, guildId, discordUserId);
+}
+
+export function updateMemberDisplayNames(
+  guildId,
+  discordUserId,
+  displayName,
+  serverNick = null
+) {
+  return getDb()
+    .prepare(
+      `UPDATE members SET discord_tag = ?, server_nick = ?
+       WHERE guild_id = ? AND discord_user_id = ?`
+    )
+    .run(displayName, serverNick, guildId, discordUserId);
 }
 
 export function getLatestSnapshot(guildId, discordUserId) {

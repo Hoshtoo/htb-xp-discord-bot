@@ -3,13 +3,28 @@ import {
   buildGuildRanking,
   formatLeaderboardLines,
 } from '../leaderboard/build-ranking.js';
+import { ensureGuild } from '../discord/ensure-guild.js';
 import { getPeriodBounds, getPeriodTitle } from '../htb/periods.js';
 
 export async function handleLeaderboard(interaction) {
   const period = interaction.options.getString('period') ?? 'all';
-  await interaction.deferReply();
+  const guildId = interaction.guildId;
 
-  const ranking = await buildGuildRanking(interaction.guildId, period);
+  if (!guildId) {
+    await interaction.editReply({
+      content: 'This command must be used in a server.',
+    });
+    return;
+  }
+
+  const guild = await ensureGuild(interaction.client, guildId);
+
+  const ranking = await buildGuildRanking(
+    guildId,
+    interaction.client,
+    period,
+    guild
+  );
 
   if (ranking.empty) {
     await interaction.editReply({

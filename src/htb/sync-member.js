@@ -10,7 +10,11 @@ import { HtbResolveError, resolveHtbUser } from './resolve.js';
  */
 export async function linkMember({
   guildId,
+  client,
   discordUser,
+  guildMember,
+  serverDisplayName,
+  serverNick,
   htbUsername,
   token,
 }) {
@@ -33,12 +37,13 @@ export async function linkMember({
   }
 
   const now = new Date().toISOString();
-  const discordTag = discordUser.displayName ?? discordUser.username;
+  const discordTag = serverDisplayName ?? discordUser.displayName ?? discordUser.username;
 
   upsertMember({
     guild_id: guildId,
     discord_user_id: discordUser.id,
     discord_tag: discordTag,
+    server_nick: serverNick ?? serverDisplayName,
     htb_username: resolved.name,
     htb_user_id: resolved.id,
     htb_account_id: parsed.accountId ?? resolved.accountId,
