@@ -162,8 +162,6 @@ You need a token from an authenticated HTB session (used like the web app’s `h
 
 Alternatively, create an app token from [Account Settings](https://app.hackthebox.com/account-settings) if you use HTB app tokens.
 
-**Never commit `.env` or share your tokens.**
-
 ---
 
 ## Usage
