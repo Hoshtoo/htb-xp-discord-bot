@@ -1,7 +1,7 @@
 import { Routes } from 'discord.js';
 import { ensureGuild } from './ensure-guild.js';
 
-const CONCURRENCY = 5;
+const CONCURRENCY = 3;
 
 function memberDisplayNameFromApi(apiMember, fallback) {
   const user = apiMember.user;
@@ -34,7 +34,10 @@ export async function getGuildDisplayName(
   const cachedGuild = guild ?? (await ensureGuild(client, guildId));
   if (cachedGuild) {
     try {
-      const member = await cachedGuild.members.fetch(discordUserId);
+      const member = await cachedGuild.members.fetch({
+        user: discordUserId,
+        force: true,
+      });
       return member.displayName;
     } catch {
       // fall through to REST

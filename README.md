@@ -168,7 +168,7 @@ Alternatively, create an app token from [Account Settings](https://app.hackthebo
 
 ## Usage
 
-All commands are **guild-scoped**: each Discord server has its own linked members and leaderboard.
+All commands are **guild-scoped**: each Discord server has its own linked members and leaderboard. If the bot is in multiple servers, run `/link` **in each server** where you want someone on the board — a link in one server does not carry over to another.
 
 ### `/link`
 
@@ -210,6 +210,8 @@ Members linked **before** nickname support was added may still have empty `serve
 | Option | Description |
 |--------|-------------|
 | `period` | Optional — `All time` (default), `This week`, or `This month` |
+| `limit` | Optional — how many members to show (1–100, default **10**). Ignored if `show` is set |
+| `show` | Optional — `Everyone linked` shows every linked member with rank (may truncate if the list exceeds Discord embed size) |
 
 Examples:
 
@@ -217,6 +219,9 @@ Examples:
 /leaderboard
 /leaderboard period:This week
 /leaderboard period:This month
+/leaderboard limit:25
+/leaderboard show:Everyone linked
+/leaderboard period:This week limit:50
 ```
 
 **Period boundaries (UTC):**
@@ -304,7 +309,7 @@ Outputs: `profile.html`, `profile.png`, `profile.txt`, `api-captures.json`.
 | Slash commands don’t appear | Run `npm run deploy-commands`; for testing, set `GUILD_ID` |
 | Startup shows **`0 guild(s)`** | Re-invite the bot using the OAuth2 URL for the **same** app as `DISCORD_TOKEN`; confirm the token was copied from **Bot → Token**, not a different application |
 | Leaderboard shows **global name**, not server nick | Enable **Server Members Intent**, re-invite the bot, run `/link` again (or `/leaderboard` after the bot is in the server with intent enabled) |
-| `Unknown interaction` (10062) | Stop duplicate bot processes (`pkill -f "node.*htb-discord-bot"`); run a single `npm start`. Ensure only one terminal/service uses the token |
+| `Unknown interaction` (10062) on `/link` or `/sync` | Discord requires a reply within **3 seconds**. Stop duplicate bot processes (`pkill -f "node.*htb-discord-bot"`); run only one `npm start`. If it happens occasionally, wait for a running `/leaderboard` to finish before `/link`, or retry the command once |
 | `Unknown Guild` (10004) on member fetch | Bot is not in the server or wrong token; fix invite + `DISCORD_TOKEN` until startup logs `1 guild(s)` |
 | `/link` fails immediately on Playwright | Run `npm run install-browser`; ensure Chrome is installed |
 | `HTB user "…" not found` | Check spelling; try numeric HTB user ID from profile URL |

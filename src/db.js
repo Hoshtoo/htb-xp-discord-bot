@@ -95,6 +95,15 @@ export function listGuildMembers(guildId) {
     .all(guildId);
 }
 
+/** All guild rows for a Discord user (e.g. cross-server /link hints). */
+export function listMemberRowsForDiscordUser(discordUserId) {
+  return getDb()
+    .prepare(
+      'SELECT guild_id, htb_username, discord_tag, server_nick FROM members WHERE discord_user_id = ?'
+    )
+    .all(discordUserId);
+}
+
 export function updateMemberXp(guildId, discordUserId, lastXp, lastSyncedAt) {
   return getDb()
     .prepare(

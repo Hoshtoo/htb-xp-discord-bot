@@ -10,7 +10,37 @@ import { fetchAllExperience } from '../htb/experience.js';
 import { getPeriodBounds, getPeriodXpSuffix } from '../htb/periods.js';
 import { recordMemberXp } from '../htb/record-xp.js';
 
-const PAGE_SIZE = 10;
+export const DEFAULT_LEADERBOARD_LIMIT = 10;
+export const MAX_LEADERBOARD_LIMIT = 100;
+const DISCORD_EMBED_DESC_MAX = 4096;
+
+/**
+ * @param {{ showAll?: boolean, limit?: number | null }} options
+ * @returns {number | null} Slice size, or null for everyone linked
+ */
+export function resolveLeaderboardLimit({ showAll = false, limit = null } = {}) {
+  if (showAll) return null;
+  const n = limit ?? DEFAULT_LEADERBOARD_LIMIT;
+  return Math.min(Math.max(1, Math.floor(n)), MAX_LEADERBOARD_LIMIT);
+}
+
+/**
+ * @param {string[]} lines
+ * @param {number} [maxChars]
+ */
+export function fitLeaderboardLines(lines, maxChars = DISCORD_EMBED_DESC_MAX) {
+  const out = [];
+  let len = 0;
+  for (const line of lines) {
+    const sep = out.length ? 1 : 0;
+    if (len + sep + line.length > maxChars - 40) {
+      return { lines: out, truncated: true };
+    }
+    out.push(line);
+    len += sep + line.length;
+  }
+  return { lines: out, truncated: false };
+}
 
 function formatRank(n) {
   if (n === 1) return '🥇';
@@ -30,8 +60,15 @@ function tagFor(member, displayNames) {
  * @param {import('discord.js').Client} client
  * @param {'all' | 'weekly' | 'monthly'} period
  * @param {import('discord.js').Guild | null} [guild]
+ * @param {number | null} [limit] null = show all linked members
  */
-export async function buildGuildRanking(guildId, client, period = 'all', guild = null) {
+export async function buildGuildRanking(
+  guildId,
+  client,
+  period = 'all',
+  guild = null,
+  limit = DEFAULT_LEADERBOARD_LIMIT
+) {
   if (!guildId) {
     throw new Error('guildId is required to build leaderboard');
   }
@@ -147,7 +184,7 @@ export async function buildGuildRanking(guildId, client, period = 'all', guild =
   });
 
   const ordered = [...withMetric, ...withoutMetric];
-  const page = ordered.slice(0, PAGE_SIZE);
+  const page = limit == null ? ordered : ordered.slice(0, limit);
 
   return {
     empty: false,
@@ -156,6 +193,8 @@ export async function buildGuildRanking(guildId, client, period = 'all', guild =
     page,
     total: ordered.length,
     xpSuffix,
+    showAll: limit == null,
+    limit: limit ?? ordered.length,
   };
 }
 
@@ -176,4 +215,5 @@ export function formatLeaderboardLines(page, xpSuffix) {
   });
 }
 
-export { PAGE_SIZE };
+/** @deprecated Use DEFAULT_LEADERBOARD_LIMIT */
+export const PAGE_SIZE = DEFAULT_LEADERBOARD_LIMIT;

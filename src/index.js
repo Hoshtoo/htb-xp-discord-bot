@@ -22,6 +22,31 @@ let htbToken;
 
 const DEFER_FIRST_COMMANDS = new Set(['link', 'sync', 'leaderboard']);
 
+/** Interactions where early defer failed (skip handler to avoid double errors). */
+const deferFailed = new WeakSet();
+
+client.prependListener(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  if (!DEFER_FIRST_COMMANDS.has(interaction.commandName)) return;
+  if (!interaction.inGuild() || interaction.deferred || interaction.replied) return;
+
+  const ageMs = Date.now() - interaction.createdTimestamp;
+  try {
+    await interaction.deferReply();
+  } catch (err) {
+    deferFailed.add(interaction);
+    console.error(
+      `deferReply failed for /${interaction.commandName} (age ${ageMs}ms, code ${err?.code}):`,
+      err.message
+    );
+    if (ageMs > 2500) {
+      console.error(
+        'Hint: interaction was near the 3s limit — avoid duplicate bot processes or run heavy commands (/leaderboard) right before /link.'
+      );
+    }
+  }
+});
+
 client.once(Events.ClientReady, async (c) => {
   await c.guilds.fetch().catch((err) => {
     console.warn('Could not prefetch guilds:', err.message);
@@ -40,6 +65,7 @@ client.once(Events.ClientReady, async (c) => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+  if (deferFailed.has(interaction)) return;
 
   if (!interaction.inGuild()) {
     await interaction.reply({
@@ -47,22 +73,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       flags: MessageFlags.Ephemeral,
     });
     return;
-  }
-
-  if (
-    DEFER_FIRST_COMMANDS.has(interaction.commandName) &&
-    !interaction.deferred &&
-    !interaction.replied
-  ) {
-    try {
-      await interaction.deferReply();
-    } catch (err) {
-      console.error(
-        `deferReply failed for /${interaction.commandName} (code ${err?.code}):`,
-        err.message
-      );
-      return;
-    }
   }
 
   try {

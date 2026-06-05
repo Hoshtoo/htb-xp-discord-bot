@@ -37,5 +37,18 @@ export const commandDefinitions = [
           { name: 'This week', value: 'weekly' },
           { name: 'This month', value: 'monthly' }
         )
+    )
+    .addIntegerOption((opt) =>
+      opt
+        .setName('limit')
+        .setDescription('How many members to show (default 10, max 100)')
+        .setMinValue(1)
+        .setMaxValue(100)
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName('show')
+        .setDescription('Show every linked member with rank')
+        .addChoices({ name: 'Everyone linked', value: 'all' })
     ),
 ].map((c) => c.toJSON());
