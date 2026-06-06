@@ -27,6 +27,7 @@ export async function fetchExperiencePublic(experienceUrl) {
 
   const res = await fetch(experienceUrl, {
     headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {

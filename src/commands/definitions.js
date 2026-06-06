@@ -51,4 +51,10 @@ export const commandDefinitions = [
         .setDescription('Show every linked member with rank')
         .addChoices({ name: 'Everyone linked', value: 'all' })
     ),
+  new SlashCommandBuilder()
+    .setName('mog')
+    .setDescription('Head-to-head HTB stat flex vs another linked member (mog anyone above; up to 5 ranks below)')
+    .addUserOption((opt) =>
+      opt.setName('member').setDescription('Member to mog').setRequired(true)
+    ),
 ].map((c) => c.toJSON());

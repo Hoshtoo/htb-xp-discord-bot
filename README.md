@@ -242,6 +242,31 @@ Remove a member’s HTB link from this server.
 |--------|-------------|
 | `member` | Discord user to unlink |
 
+### `/mog`
+
+Head-to-head HTB stat comparison to flex on another linked member and motivate them to grind.
+
+| Option | Description |
+|--------|-------------|
+| `member` | Linked Discord member to compare against (you are the challenger) |
+
+**Rules:**
+
+- Both you and the target must be **linked in this server** with working Experience URLs.
+- Both must appear on the **all-time server leaderboard** (`/leaderboard`).
+- Target must be **ranked above you** (any rank), **or** within **5 ranks below** you on the all-time leaderboard (e.g. #4 can mog #1–#3, or #5–#9, but not #10).
+- Categories are shown and scored when **at least one** player has a value **greater than 0** (rows where both are 0 are skipped).
+- You win if you beat them on a **strict majority** of compared categories (`wins > losses`; ties on a row count as not a win).
+
+**Compared stats (when at least one player > 0):** XP, total machine solves, Easy/Medium/Hard/Insane machine counts, challenge solves, sherlock solves, Pro Lab solves, Mini Pro Lab solves, Pro Lab progress %, Mini Pro Lab progress %.
+
+**Outcome:**
+
+- Majority of compared rows won → green checks on winning rows, large **`MOGGEDDDDDDD`** verdict in a second embed below the stats (target gets **@mentioned**)
+- No majority (including ties) → red X on losing rows, large **`MOG FAILED`** verdict in the second embed
+
+Requires `HTB_TOKEN` (same as `/link`) to fetch live profile progress from HTB.
+
 ---
 
 ## Project structure
@@ -262,6 +287,7 @@ htb-discord-bot/
 │   │   ├── resolve-link-name.js # Nickname capture on /link
 │   │   └── server-display-name.js
 │   ├── leaderboard/             # Ranking + period delta logic
+│   ├── mog/                     # Mog comparison + embed formatting
 │   └── htb/                     # HTB API, capture, snapshots
 ├── .env.example
 ├── package.json
@@ -317,6 +343,11 @@ Outputs: `profile.html`, `profile.png`, `profile.txt`, `api-captures.json`.
 | `Experience API failed` on sync | See [Experience API failures](#experience-api-failures-on-sync) below; often re-run `/link` after the member’s HTB Experience account is active |
 | Weekly/monthly board empty or low | Run `/sync` to record snapshots; period boards need history since period start. The bot also auto-syncs at Monday 00:00 UTC and the 1st of each month UTC for baselines |
 | Bot online but commands missing | Re-invite with `applications.commands` scope; run `npm run deploy-commands` after updates |
+| `/mog` — too far apart on leaderboard | You can mog anyone ranked above you; targets below you must be within 5 ranks |
+| `/mog` — MOG FAILED with close stats | You need a strict majority of wins on shared non-zero categories; ties on a row are not wins |
+| `/mog` — no comparable stats | Neither player has a non-zero value in any category |
+| `/mog` — not on leaderboard | Run `/link` and `/sync` so both users have XP on the all-time board |
+| `/mog` — Discord bot target | Bots cannot be mogged; pick a linked human member |
 
 ### Link and sync pipeline
 

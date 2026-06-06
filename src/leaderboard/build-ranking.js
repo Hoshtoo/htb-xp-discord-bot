@@ -114,6 +114,7 @@ export async function buildGuildRanking(
         rank: null,
         tag: tagFor(r.member, displayNames),
         htb: r.member.htb_username,
+        discordUserId: r.member.discord_user_id,
         displayXp: null,
         error: r.error,
       });
@@ -155,6 +156,7 @@ export async function buildGuildRanking(
       rank: null,
       tag: tagFor(r.member, displayNames),
       htb: r.member.htb_username,
+      discordUserId: r.member.discord_user_id,
       displayXp: metric,
       level: r.level,
       levelTitle: r.levelTitle,
@@ -169,6 +171,7 @@ export async function buildGuildRanking(
       rank: null,
       tag: tagFor(m, displayNames),
       htb: m.htb_username,
+      discordUserId: m.discord_user_id,
       displayXp: null,
       error: 'no experience URL',
       sortKey: -1,
@@ -195,7 +198,37 @@ export async function buildGuildRanking(
     xpSuffix,
     showAll: limit == null,
     limit: limit ?? ordered.length,
+    ordered,
   };
+}
+
+/**
+ * @param {Array<{ rank?: number | null, displayXp?: number | null, discordUserId?: string, tag?: string, htb?: string }>} entries
+ */
+export function buildRankMapFromEntries(entries) {
+  const map = new Map();
+  for (const entry of entries) {
+    if (entry.rank == null || entry.displayXp == null || !entry.discordUserId) continue;
+    map.set(String(entry.discordUserId), {
+      rank: entry.rank,
+      tag: entry.tag,
+      htb: entry.htb,
+      xp: entry.displayXp,
+    });
+  }
+  return map;
+}
+
+/**
+ * All-time server ranks keyed by Discord user ID (for /mog eligibility).
+ * @param {string} guildId
+ * @param {import('discord.js').Client} client
+ * @param {import('discord.js').Guild | null} [guild]
+ */
+export async function buildAllTimeRankMap(guildId, client, guild = null) {
+  const ranking = await buildGuildRanking(guildId, client, 'all', guild, null);
+  if (ranking.empty) return new Map();
+  return buildRankMapFromEntries(ranking.ordered ?? ranking.page);
 }
 
 export function formatLeaderboardLines(page, xpSuffix) {
