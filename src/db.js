@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS xp_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_xp_snapshots_period
   ON xp_snapshots (guild_id, discord_user_id, captured_at);
+
+CREATE TABLE IF NOT EXISTS scheduler_runs (
+  job         TEXT PRIMARY KEY,
+  period_key  TEXT NOT NULL,
+  ran_at      TEXT NOT NULL
+);
 `;
 
 const SNAPSHOT_RETENTION_DAYS = 90;
@@ -93,6 +99,32 @@ export function listGuildMembers(guildId) {
   return getDb()
     .prepare('SELECT * FROM members WHERE guild_id = ? ORDER BY htb_username')
     .all(guildId);
+}
+
+export function listAllLinkedMembers() {
+  return getDb()
+    .prepare(
+      `SELECT * FROM members
+       WHERE experience_url IS NOT NULL AND experience_url != ''
+       ORDER BY guild_id, htb_username`
+    )
+    .all();
+}
+
+export function getSchedulerRun(job) {
+  return getDb().prepare('SELECT * FROM scheduler_runs WHERE job = ?').get(job);
+}
+
+export function setSchedulerRun(job, periodKey, ranAt) {
+  return getDb()
+    .prepare(
+      `INSERT INTO scheduler_runs (job, period_key, ran_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (job) DO UPDATE SET
+         period_key = excluded.period_key,
+         ran_at = excluded.ran_at`
+    )
+    .run(job, periodKey, ranAt.toISOString());
 }
 
 /** All guild rows for a Discord user (e.g. cross-server /link hints). */

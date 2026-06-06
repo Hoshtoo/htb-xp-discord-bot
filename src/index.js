@@ -10,6 +10,7 @@ import { handleLink } from './commands/link.js';
 import { handleUnlink } from './commands/unlink.js';
 import { handleSync } from './commands/sync.js';
 import { handleLeaderboard } from './commands/leaderboard.js';
+import { startPeriodBaselineScheduler } from './scheduler/period-baseline-sync.js';
 
 getDb();
 pruneSnapshots();
@@ -61,6 +62,8 @@ client.once(Events.ClientReady, async (c) => {
         '(use the OAuth2 URL from the Developer Portal for this application).'
     );
   }
+
+  startPeriodBaselineScheduler();
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

@@ -94,3 +94,21 @@ export function getPeriodXpSuffix(period) {
       return ' XP';
   }
 }
+
+/** ISO week key for scheduler idempotency (Monday date, UTC). */
+export function getWeekPeriodKey(date = new Date()) {
+  return startOfIsoWeekUtc(date).toISOString().slice(0, 10);
+}
+
+/** Calendar month key for scheduler idempotency (YYYY-MM, UTC). */
+export function getMonthPeriodKey(date = new Date()) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function getWeekPeriodStart(date = new Date()) {
+  return startOfIsoWeekUtc(date);
+}
+
+export function getMonthPeriodStart(date = new Date()) {
+  return startOfMonthUtc(date);
+}

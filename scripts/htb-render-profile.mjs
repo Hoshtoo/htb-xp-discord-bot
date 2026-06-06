@@ -30,10 +30,14 @@ export async function captureProfile(userId, outDir, options = {}) {
 
   const apiCaptures = [];
 
-  const browser = await chromium.launch({
-    headless: true,
-    channel: process.env.PW_CHANNEL || 'chrome',
-  });
+  const launchOptions = { headless: true };
+  if (process.env.PW_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PW_EXECUTABLE_PATH;
+  } else {
+    launchOptions.channel = process.env.PW_CHANNEL || 'chrome';
+  }
+
+  const browser = await chromium.launch(launchOptions);
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     userAgent:

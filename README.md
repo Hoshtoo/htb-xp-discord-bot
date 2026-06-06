@@ -230,6 +230,8 @@ Examples:
 
 Period leaderboards show **XP gained during that period** (current total minus baseline at period start). Run `/sync` regularly so snapshots stay accurate.
 
+The bot also **auto-syncs all linked members** at the start of each ISO week (Monday 00:00 UTC) and calendar month (1st 00:00 UTC) to record baselines for weekly/monthly boards. If the bot was offline at a boundary, it catches up on the next startup.
+
 **Tracking caveat:** HTB only exposes lifetime XP. The bot records snapshots when you `/link`, `/sync`, or run `/leaderboard`. If no snapshot exists from before the period started, rankings use the first in-period snapshot as the baseline—so early weekly/monthly boards may undercount until history builds up.
 
 ### `/unlink`
@@ -312,9 +314,62 @@ Outputs: `profile.html`, `profile.png`, `profile.txt`, `api-captures.json`.
 | `/link` fails immediately on Playwright | Run `npm run install-browser`; ensure Chrome is installed |
 | `HTB user "…" not found` | Check spelling; try numeric HTB user ID from profile URL |
 | `no account_id` on link | HTB profile may be private; use a token that can view the profile |
-| `Experience API failed` on sync | Re-run `/link` for that member to refresh the stored URL |
-| Weekly/monthly board empty or low | Run `/sync` to record snapshots; period boards need history since period start |
+| `Experience API failed` on sync | See [Experience API failures](#experience-api-failures-on-sync) below; often re-run `/link` after the member’s HTB Experience account is active |
+| Weekly/monthly board empty or low | Run `/sync` to record snapshots; period boards need history since period start. The bot also auto-syncs at Monday 00:00 UTC and the 1st of each month UTC for baselines |
 | Bot online but commands missing | Re-invite with `applications.commands` scope; run `npm run deploy-commands` after updates |
+
+### Link and sync pipeline
+
+Understanding where failures happen makes broken links easier to diagnose:
+
+| Step | Command / code | What it does |
+|------|----------------|--------------|
+| 1 | `/link` → `resolveHtbUser` | Looks up HTB username/ID via search + profile basic API |
+| 2 | `/link` → Playwright capture | Loads the HTB profile page and records API calls |
+| 3 | `/link` → `parseExperienceFromCaptures` | Picks an Experience v1 URL from captured API traffic |
+| 4 | `/link` → DB upsert | Stores `experience_url`, `htb_account_id`, and optional `last_xp` |
+| 5 | `/sync`, `/leaderboard`, scheduler | Fetches XP from the stored Experience URL (no browser) |
+
+If step 1 fails, you see `HTB user "…" not found` or `no account_id`. If step 5 fails, the link may still have succeeded — check whether `/link` reported an **XP:** line (see below).
+
+### Experience API failures on sync
+
+**Symptom:** `/sync` or the scheduled baseline sync logs `Experience API failed (HTTP 404)` for one member, while others sync fine.
+
+**What it means:** The bot stored an Experience v1 URL like:
+
+```
+https://labs.hackthebox.com/api/experience/v1/account/{account_uuid}
+```
+
+HTB’s profile API returns that `account_id`, but the Experience API returns **404** for that UUID. The bot cannot invent XP data — HTB must serve a JSON response at that endpoint.
+
+**How to confirm:**
+
+1. Check the member row in `data/bot.db` — `last_xp` is often `null` and there are no `xp_snapshots` rows.
+2. Re-run `/link` for the member. If the success message has **no XP line**, the Experience API did not return `totalExperiencePoints` during capture.
+3. Optionally run the Playwright debug script (replace with their HTB numeric user ID):
+
+```bash
+export HTB_TOKEN='your-token'
+node scripts/htb-render-profile.mjs 169463 ./debug-output
+```
+
+Inspect `debug-output/api-captures.json` for `experience/v1/account/{uuid}` entries. A **404** on the target user’s UUID (while a **200** on the token owner’s UUID is normal) means HTB has no Experience record for that account yet.
+
+**Common causes (HTB-side):**
+
+- The member’s Experience / XP profile was never provisioned on HTB (legacy account, not migrated, etc.).
+- The member needs to log in at [app.hackthebox.com](https://app.hackthebox.com) and confirm XP/level appears on their own profile page.
+- HTB backend inconsistency: profile basic returns `account_id`, but Experience v1 does not serve data for it.
+
+**What to do:**
+
+1. Have the member open their HTB profile in a browser while logged in as themselves. If XP/level does not appear, the bot cannot track them until HTB enables Experience for that account.
+2. If XP **does** appear on HTB but sync still 404s, treat it as an HTB support issue (profile `account_id` vs Experience service mismatch).
+3. Once HTB serves their Experience API, run `/link` again for that member to refresh the stored URL.
+
+**Bot behavior note:** `/link` currently saves an Experience URL even when capture returns 404 or no XP payload, as long as a URL was observed. A link without an **XP:** line in the reply is a warning that `/sync` will likely fail until HTB returns valid Experience data.
 
 ---
 
