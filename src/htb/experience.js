@@ -1,5 +1,15 @@
 const CONCURRENCY = 5;
 const EXPERIENCE_V1_RE = /\/api\/experience\/v1\//i;
+const EXPERIENCE_ACCOUNT_PATH_RE = /^\/api\/experience\/v1\/account\/[0-9a-f-]{36}$/i;
+
+/** @param {string} url */
+export function isExperienceAccountUrl(url) {
+  try {
+    return EXPERIENCE_ACCOUNT_PATH_RE.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Public Experience v1 endpoint — no Authorization header required.
@@ -8,6 +18,11 @@ const EXPERIENCE_V1_RE = /\/api\/experience\/v1\//i;
 export async function fetchExperiencePublic(experienceUrl) {
   if (!EXPERIENCE_V1_RE.test(experienceUrl)) {
     throw new Error('URL is not an Experience v1 API endpoint');
+  }
+  if (!isExperienceAccountUrl(experienceUrl)) {
+    throw new Error(
+      'URL is not a valid Experience account endpoint (expected .../account/{uuid}, not xp-earned subpaths)'
+    );
   }
 
   const res = await fetch(experienceUrl, {

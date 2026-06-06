@@ -41,8 +41,12 @@ export async function handleLink(interaction, token) {
         ? `\n**XP:** ${result.totalExperiencePoints.toLocaleString()}`
         : '';
 
+    const reuseLine = result.reusedFromOtherGuild
+      ? '\n(Reused verified HTB link from another server — no browser capture needed.)'
+      : '';
+
     await interaction.editReply({
-      content: `Linked **${nameInfo.label}** → HTB **${result.htbUsername}** (ID ${result.htbUserId}).${xpLine}`,
+      content: `Linked **${nameInfo.label}** → HTB **${result.htbUsername}** (ID ${result.htbUserId}).${xpLine}${reuseLine}`,
     });
   } catch (err) {
     const message =

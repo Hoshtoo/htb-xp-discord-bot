@@ -371,6 +371,18 @@ Inspect `debug-output/api-captures.json` for `experience/v1/account/{uuid}` entr
 
 **Bot behavior note:** `/link` currently saves an Experience URL even when capture returns 404 or no XP payload, as long as a URL was observed. A link without an **XP:** line in the reply is a warning that `/sync` will likely fail until HTB returns valid Experience data.
 
+### Linking the same Discord user on multiple servers
+
+Links are **per server** — run `/link` in each Discord server where you want someone on the leaderboard. A link in one server does not automatically apply to another.
+
+**If `/link` works in server A but fails or `/sync` fails in server B:**
+
+1. Confirm the bot is invited to server B (`startup` logs should list that guild ID).
+2. Run `/link` again **in server B** (not server A). Each server needs its own link row.
+3. If you already linked successfully in another server, the bot now **reuses the verified Experience URL** from that server when possible — the second `/link` should be fast and skip Playwright.
+4. Avoid running `/link` on multiple servers at the exact same time; wait for the first command to finish (~10–30s) to prevent `Unknown interaction` errors.
+5. Check `data/bot.db` for a bad `experience_url` ending in `/xp-earned` — that breaks sync. Re-run `/link` in that server after updating the bot.
+
 ---
 
 ## Disclaimer

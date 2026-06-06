@@ -4,21 +4,46 @@ import { fileURLToPath } from 'url';
 import { captureProfile } from '../../scripts/htb-render-profile.mjs';
 import { buildExperienceUrl } from './resolve.js';
 
-const EXPERIENCE_URL_RE = /\/api\/experience\/v1\/account\/[0-9a-f-]{36}/i;
-
 /**
- * @param {Array<{ url: string, body?: object }>} captures
+ * @param {Array<{ url: string, status?: number, body?: object }>} captures
+ * @param {{ accountIdFallback?: string | null }} [options]
  */
-export function parseExperienceFromCaptures(captures) {
-  const hits = captures.filter((c) => EXPERIENCE_URL_RE.test(c.url));
-  const hit = hits.at(-1);
-  if (!hit) return null;
+export function parseExperienceFromCaptures(captures, options = {}) {
+  const { accountIdFallback = null } = options;
+
+  const hits = captures.filter((c) => {
+    try {
+      const pathname = new URL(c.url).pathname;
+      return /^\/api\/experience\/v1\/account\/[0-9a-f-]{36}$/i.test(pathname);
+    } catch {
+      return false;
+    }
+  });
+
+  if (hits.length === 0) return null;
+
+  const scored = hits
+    .map((capture) => ({ capture, score: scoreExperienceCapture(capture, accountIdFallback) }))
+    .sort((a, b) => b.score - a.score);
+
+  const hit = scored[0].capture;
 
   return {
     experienceUrl: hit.url,
     totalExperiencePoints: hit.body?.totalExperiencePoints ?? null,
     accountId: hit.url.match(/account\/([0-9a-f-]{36})/i)?.[1] ?? null,
   };
+}
+
+function scoreExperienceCapture(capture, accountIdFallback) {
+  let score = 0;
+  if (capture.status === 200) score += 10;
+  if (capture.body?.totalExperiencePoints != null) score += 10;
+
+  const accountId = capture.url.match(/account\/([0-9a-f-]{36})/i)?.[1] ?? null;
+  if (accountIdFallback && accountId === accountIdFallback) score += 20;
+
+  return score;
 }
 
 /**
@@ -31,7 +56,9 @@ export async function captureAndParseExperience(userId, outDir, options = {}) {
 
   const raw = await readFile(join(outDir, 'api-captures.json'), 'utf8');
   const captures = JSON.parse(raw);
-  let parsed = parseExperienceFromCaptures(captures);
+  let parsed = parseExperienceFromCaptures(captures, {
+    accountIdFallback: options.accountIdFallback,
+  });
 
   if (!parsed?.experienceUrl && options.accountIdFallback) {
     parsed = {

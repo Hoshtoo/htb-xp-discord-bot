@@ -136,6 +136,23 @@ export function listMemberRowsForDiscordUser(discordUserId) {
     .all(discordUserId);
 }
 
+/** Reuse a verified Experience URL from another guild for the same Discord + HTB user. */
+export function findReusableExperienceLink(discordUserId, htbUserId) {
+  return getDb()
+    .prepare(
+      `SELECT experience_url, htb_account_id, last_xp, htb_username
+       FROM members
+       WHERE discord_user_id = ?
+         AND htb_user_id = ?
+         AND experience_url IS NOT NULL
+         AND experience_url NOT LIKE '%/xp-earned%'
+         AND last_xp IS NOT NULL
+       ORDER BY last_synced_at DESC
+       LIMIT 1`
+    )
+    .get(discordUserId, htbUserId);
+}
+
 export function updateMemberXp(guildId, discordUserId, lastXp, lastSyncedAt) {
   return getDb()
     .prepare(
