@@ -130,10 +130,33 @@ async function handleOptOut(interaction, guildId, optOut) {
  );
 }
 
+const TEST_TYPE_MATCH = {
+ machine: ['root', 'user'],
+ challenge: ['challenge'],
+ sherlock: ['sherlock'],
+ prolab: ['prolab'],
+ fortress: ['fortress'],
+};
+
+/** Scan back through the activity feed to find the most recent event of a type. */
+async function findRecentEventOfType(htbUserId, token, matchTypes, maxPages = 6) {
+ for (let page = 1; page <= maxPages; page++) {
+ const events = await fetchUserActivity(htbUserId, token, { page, perPage: 100 });
+ if (events.length === 0) break;
+ const match = events.find((e) => matchTypes.includes(e.type));
+ if (match) return match;
+ }
+ return null;
+}
+
 async function handleTest(interaction, guildId, token) {
+ // Scanning several pages can take a moment — defer so we don't hit the 3s cap.
+ await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+ const reply = (content) => interaction.editReply({ content });
+
  const settings = getGuildSettings(guildId);
  if (!settings?.notify_channel_id) {
- await ephemeral(interaction, 'Set a channel first with `/notify channel #channel`.');
+ await reply('Set a channel first with `/notify channel #channel`.');
  return;
  }
 
@@ -144,30 +167,40 @@ async function handleTest(interaction, guildId, token) {
  channel = null;
  }
  if (!channel || typeof channel.send !== 'function') {
- await ephemeral(interaction, 'The configured channel is missing or not sendable.');
+ await reply('The configured channel is missing or not sendable.');
  return;
  }
 
- const displayName =
- interaction.member?.displayName ?? interaction.user.username;
+ const displayName = interaction.member?.displayName ?? interaction.user.username;
  const memberAvatarUrl = interaction.user.displayAvatarURL({ size: 128 });
-
- // Prefer a real, recent own from the invoking member (real box thumbnail).
  const member = getMember(guildId, interaction.user.id);
- let event = null;
  const htbUsername = member?.htb_username ?? 'sample-user';
+ const wantType = interaction.options.getString('type');
+
+ let event = null;
  let thumbnailUrl = memberAvatarUrl;
 
  if (member?.htb_user_id && token) {
  try {
+ if (wantType) {
+ const matchTypes = TEST_TYPE_MATCH[wantType] ?? [wantType];
+ event = await findRecentEventOfType(member.htb_user_id, token, matchTypes);
+ if (!event) {
+ await reply(`No recent **${wantType}** solve found in your HTB activity to preview.`);
+ return;
+ }
+ } else {
  const events = await fetchUserActivity(member.htb_user_id, token);
- if (events.length > 0) {
- event = events[0];
- thumbnailUrl = await resolveThumbnail(event, token);
+ event = events[0] ?? null;
  }
- } catch {
- /* fall back to sample below */
+ if (event) thumbnailUrl = await resolveThumbnail(event, token);
+ } catch (err) {
+ await reply(`Could not read your HTB activity: ${err.message}`);
+ return;
  }
+ } else if (wantType) {
+ await reply('You must be linked (`/link`) and `HTB_TOKEN` must be set to preview a real solve.');
+ return;
  }
 
  if (!event) {
@@ -199,5 +232,5 @@ async function handleTest(interaction, guildId, token) {
  content: '*(test notification)*',
  embeds: [embed],
  });
- await ephemeral(interaction, `Sent a test notification to <#${settings.notify_channel_id}>.`);
+ await reply(`Sent a test notification to <#${settings.notify_channel_id}>.`);
 }

@@ -88,6 +88,20 @@ export const commandDefinitions = [
  sub.setName('optin').setDescription('Resume announcing your HTB owns')
  )
  .addSubcommand((sub) =>
- sub.setName('test').setDescription('Post a sample notification to the configured channel')
+ sub
+ .setName('test')
+ .setDescription('Post a sample notification to the configured channel')
+ .addStringOption((opt) =>
+ opt
+ .setName('type')
+ .setDescription('Preview a specific content type from your recent solves')
+ .addChoices(
+ { name: 'Machine (user/root)', value: 'machine' },
+ { name: 'Challenge', value: 'challenge' },
+ { name: 'Sherlock', value: 'sherlock' },
+ { name: 'Pro Lab', value: 'prolab' },
+ { name: 'Fortress', value: 'fortress' }
+ )
+ )
  ),
 ].map((c) => c.toJSON());
