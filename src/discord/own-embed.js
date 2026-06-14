@@ -121,14 +121,10 @@ export function buildOwnEmbed({
 
  embed.addFields(fields);
 
- // Wide cover art for labs/fortresses reads better as the big image;
- // square box/challenge/sherlock avatars look best as a thumbnail.
+ // Square thumbnail (top-right) reads cleanly for every type; wide Pro Lab /
+ // Fortress covers look letterboxed when used as the big image.
  if (thumbnailUrl) {
- if (event.type === 'prolab' || event.type === 'fortress') {
- embed.setImage(thumbnailUrl);
- } else {
  embed.setThumbnail(thumbnailUrl);
- }
  }
 
  return embed;

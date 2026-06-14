@@ -79,7 +79,7 @@ async function fetchThumbnailFallback(event, token) {
  case 'prolab': {
  const body = await fetchJson(`/prolab/${event.parentId}/info`, token);
  const data = body?.data ?? {};
- url = pickBest([data.cover_image_url, data.avatar_url, data.avatar_48_url]);
+ url = pickBest([data.avatar_url, data.avatar_48_url, data.cover_image_url]);
  break;
  }
  case 'fortress': {
