@@ -8,6 +8,8 @@ import {
  listNotifiableMembers,
 } from '../db.js';
 import { buildOwnEmbed } from '../discord/own-embed.js';
+import { fetchUserActivity } from '../htb/activity.js';
+import { resolveThumbnail } from '../htb/thumbnails.js';
 
 const ADMIN_SUBCOMMANDS = new Set(['channel', 'enable', 'disable', 'test']);
 
@@ -19,7 +21,7 @@ function hasManageGuild(interaction) {
  return Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild));
 }
 
-export async function handleNotify(interaction) {
+export async function handleNotify(interaction, token) {
  const sub = interaction.options.getSubcommand();
  const guildId = interaction.guildId;
 
@@ -42,7 +44,7 @@ export async function handleNotify(interaction) {
  case 'optin':
  return handleOptOut(interaction, guildId, false);
  case 'test':
- return handleTest(interaction, guildId);
+ return handleTest(interaction, guildId, token);
  default:
  return ephemeral(interaction, 'Unknown notify subcommand.');
  }
@@ -128,7 +130,7 @@ async function handleOptOut(interaction, guildId, optOut) {
  );
 }
 
-async function handleTest(interaction, guildId) {
+async function handleTest(interaction, guildId, token) {
  const settings = getGuildSettings(guildId);
  if (!settings?.notify_channel_id) {
  await ephemeral(interaction, 'Set a channel first with `/notify channel #channel`.');
@@ -148,8 +150,28 @@ async function handleTest(interaction, guildId) {
 
  const displayName =
  interaction.member?.displayName ?? interaction.user.username;
+ const memberAvatarUrl = interaction.user.displayAvatarURL({ size: 128 });
 
- const sampleEvent = {
+ // Prefer a real, recent own from the invoking member (real box thumbnail).
+ const member = getMember(guildId, interaction.user.id);
+ let event = null;
+ const htbUsername = member?.htb_username ?? 'sample-user';
+ let thumbnailUrl = memberAvatarUrl;
+
+ if (member?.htb_user_id && token) {
+ try {
+ const events = await fetchUserActivity(member.htb_user_id, token);
+ if (events.length > 0) {
+ event = events[0];
+ thumbnailUrl = await resolveThumbnail(event, token);
+ }
+ } catch {
+ /* fall back to sample below */
+ }
+ }
+
+ if (!event) {
+ event = {
  type: 'root',
  id: 1,
  name: 'Imagery',
@@ -163,13 +185,14 @@ async function handleTest(interaction, guildId) {
  parentIdentifier: null,
  eventKey: 'test',
  };
+ }
 
  const embed = buildOwnEmbed({
- event: sampleEvent,
+ event,
  displayName,
- htbUsername: 'sample-user',
- thumbnailUrl: 'https://labs.hackthebox.com/images/favicon.png',
- memberAvatarUrl: interaction.user.displayAvatarURL({ size: 128 }),
+ htbUsername,
+ thumbnailUrl,
+ memberAvatarUrl,
  });
 
  await channel.send({

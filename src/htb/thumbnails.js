@@ -47,7 +47,8 @@ async function fetchJson(path, token) {
  */
 function pickBest(candidates) {
  const normalized = candidates.map(normalizeAvatarUrl).filter(Boolean);
- return normalized.find(isRenderable) ?? normalized[0] ?? null;
+ // Only return raster images — Discord embeds can't render SVG.
+ return normalized.find(isRenderable) ?? null;
 }
 
 /**
@@ -125,5 +126,7 @@ export async function resolveThumbnail(event, token) {
  const fallback = await fetchThumbnailFallback(event, token);
  if (fallback) return fallback;
 
- return feedAvatar; // may be an SVG, but better than a blank embed
+ // Only an SVG (or nothing) is available — return null so we show no broken
+ // image rather than an unrenderable SVG.
+ return null;
 }

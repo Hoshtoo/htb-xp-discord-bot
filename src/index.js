@@ -90,7 +90,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
  await handleMog(interaction, htbToken);
  break;
  case 'notify':
- await handleNotify(interaction);
+ await handleNotify(interaction, htbToken);
  break;
  default:
  await interaction.reply({
