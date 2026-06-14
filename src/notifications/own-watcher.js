@@ -12,10 +12,12 @@ import { buildOwnEmbed } from '../discord/own-embed.js';
 import { buildEmbedImage } from '../discord/embed-image.js';
 import { ensureGuild } from '../discord/ensure-guild.js';
 
-const POLL_INTERVAL_MS = Number(process.env.NOTIFY_POLL_INTERVAL_MS) || 90_000;
+const POLL_INTERVAL_MS = Number(process.env.NOTIFY_POLL_INTERVAL_MS) || 900_000; // 15 min
 const MEMBER_CONCURRENCY = 4;
 // Safety cap so a member who owned a huge batch can't flood the channel.
-const MAX_POST_PER_MEMBER = 8;
+// Higher than the poll-every-90s default since a 15-min window can accumulate
+// more owns (e.g. a Pro Lab flag grind) that are all worth announcing.
+const MAX_POST_PER_MEMBER = 20;
 
 let intervalId = null;
 let running = false;
@@ -77,7 +79,7 @@ function seedMember(guildId, member, events) {
 async function processMember(channel, guild, member, token) {
  let events;
  try {
- events = await fetchUserActivity(member.htb_user_id, token);
+ events = await fetchUserActivity(member.htb_user_id, token, { perPage: 50 });
  } catch (err) {
  console.warn(
  `[notify] activity fetch failed for ${member.htb_username} (guild ${member.guild_id}): ${err.message}`
@@ -188,11 +190,11 @@ export function startOwnWatcher(client, token) {
  return;
  }
 
- console.log(
- `[notify] Own-notification watcher enabled (polling every ${Math.round(
- POLL_INTERVAL_MS / 1000
- )}s)`
- );
+ const everyLabel =
+ POLL_INTERVAL_MS >= 60_000
+ ? `${Math.round(POLL_INTERVAL_MS / 60_000)} min`
+ : `${Math.round(POLL_INTERVAL_MS / 1000)}s`;
+ console.log(`[notify] Own-notification watcher enabled (polling every ${everyLabel})`);
 
  poll(client, token).catch((err) =>
  console.error('[notify] initial poll failed:', err.message)

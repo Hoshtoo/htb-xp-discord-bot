@@ -10,7 +10,7 @@ thumbnail of the box/lab in the embed.
 
 The bot polls each linked member's HTB activity feed
 (`GET https://labs.hackthebox.com/api/v5/user/profile/activity/{userId}`) every
-~90 seconds. That single feed returns owns across every content type:
+~15 minutes. That single feed returns owns across every content type:
 
 | HTB `type` | Notification |
 |------------|--------------|
@@ -76,13 +76,14 @@ for 6 hours.
 
 | Env var | Default | Purpose |
 |---------|---------|---------|
-| `NOTIFY_POLL_INTERVAL_MS` | `90000` | How often (ms) to poll HTB for new owns |
+| `NOTIFY_POLL_INTERVAL_MS` | `900000` (15 min) | How often (ms) to poll HTB for new owns |
 
 ## Notes / caveats
 
 - HTB's API is **unofficial** and may change; the watcher logs and skips on
   errors rather than crashing.
-- Only page 1 of each member's feed is read per poll. A member completing more
-  than ~30 items within one poll interval could have the overflow missed (rare).
-- A flood cap of 8 announcements per member per poll prevents channel spam after
+- Only the first page (50 items) of each member's feed is read per poll. A member
+  completing more than 50 items within one poll interval could have the overflow
+  missed (rare).
+- A flood cap of 20 announcements per member per poll prevents channel spam after
   big batches; capped-over events are not re-announced.
