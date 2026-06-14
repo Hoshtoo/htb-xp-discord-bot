@@ -87,3 +87,11 @@ for 6 hours.
   missed (rare).
 - A flood cap of 20 announcements per member per poll prevents channel spam after
   big batches; capped-over events are not re-announced.
+
+## Known items / to investigate
+
+- **Pro Lab / Fortress "Points":** the embed shows the `points` value HTB returns
+  for each flag event (e.g. a Dante flag reports `points: 10`). The exact meaning
+  of these points for Pro Labs/Fortresses — and how they relate to overall XP —
+  needs more investigation. If they turn out to be misleading, the "Points" field
+  can be hidden for `prolab`/`fortress` types in `src/discord/own-embed.js`.

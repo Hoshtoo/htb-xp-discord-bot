@@ -8,6 +8,7 @@ A Discord bot that links server members to [Hack The Box](https://www.hackthebox
 - **`/sync`** — Refresh XP for linked members from stored HTB Experience API URLs
 - **`/leaderboard`** — All-time, weekly, or monthly XP rankings (per-server)
 - **`/mog`** — Head-to-head HTB stat comparison vs another linked member (rank-gated)
+- **`/notify`** — Per-server **own/completion notifications**: announces when linked members get user/root on a machine, finish a challenge or Sherlock, or submit a Pro Lab / Fortress flag — with a thumbnail of the box/lab (see [Own / completion notifications](#own--completion-notifications))
 - **`/unlink`** — Remove a member's link and their XP snapshot history for that server
 - Per-guild SQLite storage with XP snapshot history (no external database required)
 - Username resolution via HTB search API (no need to look up numeric IDs manually)
@@ -25,8 +26,9 @@ A Discord bot that links server members to [Hack The Box](https://www.hackthebox
 | **XP history** | Each sync/leaderboard/link records a snapshot; weekly/monthly boards compare current total vs period start |
 | **Display names** | `/link` stores server nickname + display label; `/leaderboard` re-fetches live names from Discord and updates the database |
 | **Scheduler** | Every minute, checks whether the ISO week or calendar month just started (UTC); if so, syncs all linked members across all guilds and records baselines |
+| **Notifications** | A watcher polls each linked member's HTB v5 activity feed every ~15 min; new owns (machine user/root, challenge, Sherlock, Pro Lab flag, Fortress flag) are posted to a configured channel with a thumbnail. First poll per member is silently seeded so old activity is never replayed |
 
-`/link` is the only command that uses Playwright. `/link` and `/mog` require a valid `HTB_TOKEN`. Chrome (or Chromium) must be installed on the host for `/link`.
+`/link` is the only command that uses Playwright. `/link`, `/mog`, and the notification watcher require a valid `HTB_TOKEN`. Chrome (or Chromium) must be installed on the host for `/link`.
 
 ## Requirements
 
@@ -36,6 +38,11 @@ A Discord bot that links server members to [Hack The Box](https://www.hackthebox
 - An **HTB app token** for `/link` and `/mog` (see below)
 
 ## Quick start
+
+> New to this? Follow the complete, beginner-friendly walkthrough in
+> [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) — it covers installing the
+> right Node version, getting tokens, and turning on notifications, with fixes for
+> common pitfalls.
 
 ```bash
 git clone https://github.com/Hoshtoo/htb-discord-bot.git
@@ -49,6 +56,11 @@ npm start
 ```
 
 Invite the bot to your server (see [Invite the bot](#6-invite-the-bot)), then run `/link` in a channel.
+
+> [!TIP]
+> Use **Node.js 20 or 22 LTS**. On newer/odd-numbered Node releases, `npm install`
+> may try to compile `better-sqlite3` from source (needs Python + build tools).
+> See [Getting Started → prerequisites](docs/GETTING_STARTED.md#1-install-prerequisites).
 
 ---
 
@@ -158,6 +170,7 @@ Keep the process running (terminal, `systemd`, `pm2`, Docker, etc.).
 | `GUILD_ID` | No | If set, `deploy-commands` registers commands only to this guild |
 | `PW_CHANNEL` | No | Playwright browser channel (default: `chrome`) |
 | `PW_EXECUTABLE_PATH` | No | Path to a system browser binary instead of Playwright-managed Chrome (common on **ARM64 / Raspberry Pi**, e.g. `/usr/bin/chromium`) |
+| `NOTIFY_POLL_INTERVAL_MS` | No | How often (ms) the notification watcher polls HTB for new owns (default `900000` = 15 min) |
 
 `/sync` and `/leaderboard` use the public Experience API only (no `HTB_TOKEN` in those requests), but the bot still **will not start** without `HTB_TOKEN` set in `.env`.
 
@@ -187,6 +200,7 @@ All commands are **guild-scoped** and **server-only** (DMs are rejected). Each D
 | `/sync` | Yes | No (public XP API) | Refresh XP for one member or everyone linked in this server |
 | `/leaderboard` | Yes | No | Ranked embed; optional period, limit, or show-all |
 | `/mog` | Yes | Yes (profile stats) | Head-to-head stat flex vs another linked member |
+| `/notify` | Mixed | Yes (activity feed) | Configure per-server own/completion notifications (see below) |
 | `/unlink` | No | No | Remove link + snapshot history for this server |
 
 Long-running commands are **deferred immediately** in `src/index.js` (before handler logic) so Discord always gets an acknowledgement within 3 seconds.
@@ -302,6 +316,68 @@ Requires `HTB_TOKEN` (same as `/link`) to fetch live profile progress from HTB.
 
 ---
 
+## Own / completion notifications
+
+Automatically announce in a channel when linked members complete HTB content —
+**machine user/root owns, challenges, Sherlocks, Pro Lab flags, and Fortress
+flags** — each with a thumbnail of the box/lab.
+
+> Example: **ejee got root on Imagery** with the machine avatar attached.
+
+### How it works
+
+A background watcher polls each linked member's HTB v5 activity feed
+(`GET /api/v5/user/profile/activity/{userId}`) every ~15 minutes
+(`NOTIFY_POLL_INTERVAL_MS`). That single feed covers every content type:
+
+| HTB `type` | Notification |
+|------------|--------------|
+| `user` | *X got user on `<machine>`* |
+| `root` | *X got root on `<machine>`* (first bloods highlighted) |
+| `challenge` | *X solved the challenge `<name>`* |
+| `sherlock` | *X solved the Sherlock `<name>`* |
+| `prolab` | *X owned a flag in `<pro lab>`* — **one per flag**, incl. mini Pro Labs |
+| `fortress` | *X owned a flag in `<fortress>`* — **one per flag** |
+
+- **All linked members are watched by default**; anyone can opt out with
+  `/notify optout` (and back in with `/notify optin`).
+- **No historical spam:** the first poll per member silently records existing
+  owns; only owns that happen *afterwards* are announced.
+- **Exactly once:** a dedupe ledger guarantees each own is announced at most once,
+  even across restarts or overlapping polls.
+- **Thumbnails:** images come from the activity feed; HTB serves some as SVG
+  (challenge categories, Fortress/Pro Lab logos), which Discord can't render, so
+  those are fetched and rasterized to PNG via `@resvg/resvg-js`. Pro Lab logos
+  are pulled from `/prolab/{id}/info` since the feed omits them.
+
+### Commands
+
+| Command | Who can use | Description |
+|---------|-------------|-------------|
+| `/notify channel #channel` | Manage Server | Set the announcement channel **and** enable notifications |
+| `/notify enable` | Manage Server | Enable notifications (a channel must already be set) |
+| `/notify disable` | Manage Server | Disable notifications for this server |
+| `/notify status` | Anyone | Show settings, watched-member count, and your opt status |
+| `/notify optout` | Anyone | Stop your own owns from being announced |
+| `/notify optin` | Anyone | Resume announcing your owns |
+| `/notify test [type]` | Manage Server | Post a sample notification; optional `type` (machine/challenge/sherlock/prolab/fortress) previews your most recent solve of that type |
+
+### Quick start
+
+```
+/notify channel #htb-pwns
+```
+
+That's it — the channel is set, notifications are on, and every linked member is
+watched. New owns appear within ~15 minutes automatically. Use `/notify test`
+to confirm the bot can post.
+
+Requires `HTB_TOKEN`. The watcher is **idle until a channel is configured**, so
+servers that don't use it incur no API calls. Full details:
+[`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md).
+
+---
+
 ## Project structure
 
 ```
@@ -322,18 +398,31 @@ htb-discord-bot/
 │   ├── leaderboard/             # Ranking + period delta logic
 │   ├── mog/                     # Mog comparison + embed formatting
 │   ├── scheduler/               # Weekly/monthly baseline auto-sync
+│   ├── notifications/           # Own-notification watcher (poll → post)
+│   │   └── own-watcher.js
 │   └── htb/                     # HTB API, capture, snapshots
+│       ├── activity.js          # v5 user activity feed (owns across all types)
+│       └── thumbnails.js        # Box/lab thumbnail resolution (+ v4 fallbacks)
+├── docs/
+│   └── NOTIFICATIONS.md         # Own-notification feature docs
 ├── .env.example
 ├── package.json
 └── README.md
 ```
 
+The own-notification embeds are built in `src/discord/own-embed.js`, with SVG→PNG
+rasterization in `src/discord/embed-image.js`; the `/notify` command lives in
+`src/commands/notify.js`.
+
 Data created at runtime (gitignored):
 
 - `data/bot.db` — SQLite with:
-  - `members` — per-guild links (`discord_tag`, `server_nick`, HTB ids, `experience_url`, `last_xp`)
+  - `members` — per-guild links (`discord_tag`, `server_nick`, HTB ids, `experience_url`, `last_xp`, `notify_opt_out`)
   - `xp_snapshots` — XP history for period leaderboards (**90-day retention**, pruned after monthly baseline sync)
   - `scheduler_runs` — last run time for weekly/monthly baseline jobs
+  - `guild_settings` — per-server notification channel + enabled flag
+  - `activity_cursors` — per-member seed state for the notification watcher
+  - `posted_events` — dedupe ledger so each own is announced once (**45-day retention**)
 - `data/captures/` — temporary Playwright output (deleted after `/link`)
 
 ---
