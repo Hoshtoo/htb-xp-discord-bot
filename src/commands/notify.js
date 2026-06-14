@@ -8,6 +8,7 @@ import {
  listNotifiableMembers,
 } from '../db.js';
 import { buildOwnEmbed } from '../discord/own-embed.js';
+import { buildEmbedImage } from '../discord/embed-image.js';
 import { fetchUserActivity } from '../htb/activity.js';
 import { resolveThumbnail } from '../htb/thumbnails.js';
 
@@ -178,7 +179,7 @@ async function handleTest(interaction, guildId, token) {
  const wantType = interaction.options.getString('type');
 
  let event = null;
- let thumbnailUrl = memberAvatarUrl;
+ let rawThumb = memberAvatarUrl;
 
  if (member?.htb_user_id && token) {
  try {
@@ -193,7 +194,7 @@ async function handleTest(interaction, guildId, token) {
  const events = await fetchUserActivity(member.htb_user_id, token);
  event = events[0] ?? null;
  }
- if (event) thumbnailUrl = await resolveThumbnail(event, token);
+ if (event) rawThumb = await resolveThumbnail(event, token);
  } catch (err) {
  await reply(`Could not read your HTB activity: ${err.message}`);
  return;
@@ -220,6 +221,7 @@ async function handleTest(interaction, guildId, token) {
  };
  }
 
+ const { url: thumbnailUrl, files } = await buildEmbedImage(rawThumb);
  const embed = buildOwnEmbed({
  event,
  displayName,
@@ -231,6 +233,7 @@ async function handleTest(interaction, guildId, token) {
  await channel.send({
  content: '*(test notification)*',
  embeds: [embed],
+ files,
  });
  await reply(`Sent a test notification to <#${settings.notify_channel_id}>.`);
 }

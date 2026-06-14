@@ -9,6 +9,7 @@ import {
 import { fetchUserActivity } from '../htb/activity.js';
 import { resolveThumbnail } from '../htb/thumbnails.js';
 import { buildOwnEmbed } from '../discord/own-embed.js';
+import { buildEmbedImage } from '../discord/embed-image.js';
 import { ensureGuild } from '../discord/ensure-guild.js';
 
 const POLL_INTERVAL_MS = Number(process.env.NOTIFY_POLL_INTERVAL_MS) || 90_000;
@@ -109,7 +110,8 @@ async function processMember(channel, guild, member, token) {
 
  for (const event of toPost) {
  try {
- const thumbnailUrl = await resolveThumbnail(event, token);
+ const rawThumb = await resolveThumbnail(event, token);
+ const { url: thumbnailUrl, files } = await buildEmbedImage(rawThumb);
  const embed = buildOwnEmbed({
  event,
  displayName,
@@ -117,7 +119,7 @@ async function processMember(channel, guild, member, token) {
  thumbnailUrl,
  memberAvatarUrl,
  });
- await channel.send({ embeds: [embed] });
+ await channel.send({ embeds: [embed], files });
  } catch (err) {
  console.warn(
  `[notify] failed to post ${event.type} own for ${member.htb_username}: ${err.message}`

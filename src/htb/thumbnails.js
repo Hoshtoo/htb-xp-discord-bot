@@ -20,15 +20,6 @@ export function normalizeAvatarUrl(url) {
  return `${STORAGE_BASE}/${trimmed}`;
 }
 
-/**
- * Discord embeds render PNG/JPG/GIF/WebP but NOT SVG. Prefer raster images.
- * @param {string|null} url
- */
-function isRenderable(url) {
- if (!url) return false;
- return !/\.svg(\?.*)?$/i.test(url);
-}
-
 async function fetchJson(path, token) {
  const res = await fetch(`${API_V4_BASE}${path}`, {
  headers: {
@@ -42,18 +33,19 @@ async function fetchJson(path, token) {
 }
 
 /**
- * Pick the first renderable (non-SVG) candidate, else the first defined one.
+ * First defined candidate, normalized to an absolute URL. Candidates should be
+ * passed in preference order (best/square logo first). SVGs are allowed — the
+ * embed image layer rasterizes them to PNG before sending to Discord.
  * @param {Array<string|null|undefined>} candidates
  */
-function pickBest(candidates) {
+function pickFirst(candidates) {
  const normalized = candidates.map(normalizeAvatarUrl).filter(Boolean);
- // Only return raster images — Discord embeds can't render SVG.
- return normalized.find(isRenderable) ?? null;
+ return normalized[0] ?? null;
 }
 
 /**
- * Fetch a raster thumbnail for a given content type from v4 detail endpoints.
- * Results (including misses) are cached to avoid hammering the API.
+ * Fetch a thumbnail for content types whose activity item has no usable avatar
+ * (notably Pro Labs). Results are cached to avoid hammering the API.
  * @param {import('./activity.js').ActivityEvent} event
  * @param {string} token
  * @returns {Promise<string|null>}
@@ -73,25 +65,26 @@ async function fetchThumbnailFallback(event, token) {
  case 'root':
  case 'user': {
  const body = await fetchJson(`/machine/profile/${event.id}`, token);
- url = pickBest([body?.info?.avatar]);
+ url = pickFirst([body?.info?.avatar]);
  break;
  }
  case 'prolab': {
  const body = await fetchJson(`/prolab/${event.parentId}/info`, token);
  const data = body?.data ?? {};
- url = pickBest([data.avatar_url, data.avatar_48_url, data.cover_image_url]);
+ // Prefer the square logo over the wide cover banner.
+ url = pickFirst([data.avatar_url, data.avatar_48_url, data.cover_image_url]);
  break;
  }
  case 'fortress': {
  const body = await fetchJson(`/fortress/${event.parentId}`, token);
  const data = body?.data ?? body ?? {};
- url = pickBest([data.cover_image_url, data.image, data.logo]);
+ url = pickFirst([data.logo, data.cover_image_url, data.image]);
  break;
  }
  case 'sherlock': {
  const body = await fetchJson(`/sherlocks/${event.id}/info`, token);
  const data = body?.data ?? {};
- url = pickBest([data.avatar, data.avatar_url]);
+ url = pickFirst([data.avatar, data.avatar_url]);
  break;
  }
  case 'challenge':
@@ -99,8 +92,7 @@ async function fetchThumbnailFallback(event, token) {
  url = null;
  break;
  }
- } catch (err) {
- // Network/parse issues shouldn't break a notification — fall back to feed avatar.
+ } catch {
  url = null;
  }
 
@@ -109,24 +101,19 @@ async function fetchThumbnailFallback(event, token) {
 }
 
 /**
- * Resolve the best embed image URL for an own event.
- *
- * Strategy: use the feed-provided avatar when it's a renderable raster image;
- * otherwise try a v4 detail endpoint for a PNG/JPG; otherwise fall back to the
- * feed avatar even if it's an SVG (better than nothing).
+ * Resolve the best embed image URL for an own event. May return an SVG URL —
+ * callers should pass the result through `buildEmbedImage` which rasterizes SVG
+ * to PNG for Discord.
  *
  * @param {import('./activity.js').ActivityEvent} event
  * @param {string} token
  * @returns {Promise<string|null>}
  */
 export async function resolveThumbnail(event, token) {
+ // Feed avatar covers machines/sherlocks (PNG) and challenges/fortresses (SVG logo).
  const feedAvatar = normalizeAvatarUrl(event.avatar);
- if (feedAvatar && isRenderable(feedAvatar)) return feedAvatar;
+ if (feedAvatar) return feedAvatar;
 
- const fallback = await fetchThumbnailFallback(event, token);
- if (fallback) return fallback;
-
- // Only an SVG (or nothing) is available — return null so we show no broken
- // image rather than an unrenderable SVG.
- return null;
+ // Pro Labs (and any item lacking a feed avatar) fall back to a detail endpoint.
+ return fetchThumbnailFallback(event, token);
 }
