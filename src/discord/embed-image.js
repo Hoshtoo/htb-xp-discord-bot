@@ -44,6 +44,21 @@ async function svgToPng(url) {
 let attachmentSeq = 0;
 
 /**
+ * URL suitable for HTML <img> tags (rasterizes SVG to a data URI).
+ * @param {string|null} url
+ * @returns {Promise<string|null>}
+ */
+export async function buildDisplayImageUrl(url) {
+ if (!url) return null;
+ if (RASTER_RE.test(url)) return url;
+ if (SVG_RE.test(url)) {
+  const png = await svgToPng(url);
+  return png ? `data:image/png;base64,${png.toString('base64')}` : null;
+ }
+ return url;
+}
+
+/**
  * Turn a resolved image URL into something Discord can render.
  *
  * - Raster URLs (PNG/JPG/GIF/WebP) are used directly.

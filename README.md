@@ -26,7 +26,7 @@ A Discord bot that links server members to [Hack The Box](https://www.hackthebox
 | **XP history** | Each sync/leaderboard/link records a snapshot; weekly/monthly boards compare current total vs period start |
 | **Display names** | `/link` stores server nickname + display label; `/leaderboard` re-fetches live names from Discord and updates the database |
 | **Scheduler** | Every minute, checks whether the ISO week or calendar month just started (UTC); if so, syncs all linked members across all guilds and records baselines |
-| **Notifications** | A watcher polls each linked member's HTB v5 activity feed every ~15 min; new owns (machine user/root, challenge, Sherlock, Pro Lab flag, Fortress flag) are posted to a configured channel with a thumbnail. First poll per member is silently seeded so old activity is never replayed |
+| **Notifications** | A watcher polls each linked member's HTB v5 activity feed every ~20 min; new owns (machine user/root, challenge, Sherlock, Pro Lab flag, Fortress flag) are posted to a configured channel with a thumbnail. First poll per member is silently seeded so old activity is never replayed |
 
 `/link` is the only command that uses Playwright. `/link`, `/mog`, and the notification watcher require a valid `HTB_TOKEN`. Chrome (or Chromium) must be installed on the host for `/link`.
 
@@ -170,7 +170,7 @@ Keep the process running (terminal, `systemd`, `pm2`, Docker, etc.).
 | `GUILD_ID` | No | If set, `deploy-commands` registers commands only to this guild |
 | `PW_CHANNEL` | No | Playwright browser channel (default: `chrome`) |
 | `PW_EXECUTABLE_PATH` | No | Path to a system browser binary instead of Playwright-managed Chrome (common on **ARM64 / Raspberry Pi**, e.g. `/usr/bin/chromium`) |
-| `NOTIFY_POLL_INTERVAL_MS` | No | How often (ms) the notification watcher polls HTB for new owns (default `900000` = 15 min) |
+| `NOTIFY_POLL_INTERVAL_MS` | No | How often (ms) the notification watcher polls HTB for new owns (default `1200000` = 20 min) |
 
 `/sync` and `/leaderboard` use the public Experience API only (no `HTB_TOKEN` in those requests), but the bot still **will not start** without `HTB_TOKEN` set in `.env`.
 
@@ -327,7 +327,7 @@ flags** — each with a thumbnail of the box/lab.
 ### How it works
 
 A background watcher polls each linked member's HTB v5 activity feed
-(`GET /api/v5/user/profile/activity/{userId}`) every ~15 minutes
+(`GET /api/v5/user/profile/activity/{userId}`) every ~20 minutes
 (`NOTIFY_POLL_INTERVAL_MS`). That single feed covers every content type:
 
 | HTB `type` | Notification |
@@ -369,7 +369,7 @@ A background watcher polls each linked member's HTB v5 activity feed
 ```
 
 That's it — the channel is set, notifications are on, and every linked member is
-watched. New owns appear within ~15 minutes automatically. Use `/notify test`
+watched. New owns appear within ~20 minutes automatically. Use `/notify test`
 to confirm the bot can post.
 
 Requires `HTB_TOKEN`. The watcher is **idle until a channel is configured**, so
@@ -378,13 +378,38 @@ servers that don't use it incur no API calls. Full details:
 
 ---
 
+## Offline showcase
+
+Generate a **sample database** and an **HTML preview** of notification embeds and
+leaderboards — no Discord token or live HTB API calls required:
+
+```bash
+npm run showcase
+```
+
+Creates:
+
+- `data/showcase.db` — 6 linked members, XP snapshot history, notification settings, dedupe state
+- `showcase/output/index.html` — visual preview (open in a browser)
+
+Use Node.js **20 or 22 LTS** (same as the bot). Programmatic API: `import { runShowcase } from './src/showcase/index.js'`.
+
+To post the same demo content into a **real Discord test server**, configure
+`TEST_GUILD_ID` and `TEST_CHANNEL_ID` in `.env` and run `npm run showcase:discord`.
+See [`docs/SHOWCASE_DISCORD.md`](docs/SHOWCASE_DISCORD.md).
+
+---
+
 ## Project structure
 
 ```
 htb-discord-bot/
 ├── scripts/
-│   └── htb-render-profile.mjs   # Playwright profile capture (used by /link)
+│   ├── htb-render-profile.mjs   # Playwright profile capture (used by /link)
+│   ├── showcase.mjs             # Offline notification + leaderboard demo
+│   └── showcase-discord.mjs     # Post showcase to TEST_GUILD_ID / TEST_CHANNEL_ID
 ├── src/
+│   ├── showcase/                # Sample DB seeding + HTML preview library
 │   ├── index.js                 # Bot entry point
 │   ├── deploy-commands.js         # Slash command registration
 │   ├── config.js
@@ -404,7 +429,8 @@ htb-discord-bot/
 │       ├── activity.js          # v5 user activity feed (owns across all types)
 │       └── thumbnails.js        # Box/lab thumbnail resolution (+ v4 fallbacks)
 ├── docs/
-│   └── NOTIFICATIONS.md         # Own-notification feature docs
+│   ├── NOTIFICATIONS.md         # Own-notification feature docs
+│   └── SHOWCASE_DISCORD.md      # Post showcase embeds to a test Discord server
 ├── .env.example
 ├── package.json
 └── README.md

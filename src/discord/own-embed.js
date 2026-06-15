@@ -99,10 +99,6 @@ export function buildOwnEmbed({
 
  const fields = [{ name: 'Type', value: meta.label, inline: true }];
 
- if (event.points) {
- fields.push({ name: 'Points', value: `+${event.points}`, inline: true });
- }
-
  if (event.type === 'challenge' && event.categoryName) {
  fields.push({ name: 'Category', value: event.categoryName, inline: true });
  }

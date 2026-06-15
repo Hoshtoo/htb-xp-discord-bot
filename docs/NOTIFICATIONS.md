@@ -10,7 +10,7 @@ thumbnail of the box/lab in the embed.
 
 The bot polls each linked member's HTB activity feed
 (`GET https://labs.hackthebox.com/api/v5/user/profile/activity/{userId}`) every
-~15 minutes. That single feed returns owns across every content type:
+~20 minutes. That single feed returns owns across every content type:
 
 | HTB `type` | Notification |
 |------------|--------------|
@@ -32,19 +32,17 @@ each own is announced at most once, even across restarts or overlapping polls.
 
 ### Thumbnails
 
-Each activity item usually includes an `avatar` image URL, used directly as the
-embed image. Discord can't render SVGs, so for items whose feed image is an SVG
-(some challenge categories, Fortress logos) the bot falls back to a v4 detail
-endpoint to find a PNG/JPG:
+Each activity item usually includes an `avatar` image URL. Discord can't render
+SVGs, so SVG feed images (some challenge categories, Fortress logos) are fetched
+and rasterized to PNG via `@resvg/resvg-js`. When the feed omits an image (notably
+Pro Labs), the bot falls back to a v4 detail endpoint:
 
 - Machines → `/machine/profile/{id}`
-- Pro Labs → `/prolab/{id}/info`
+- Pro Labs → `/prolab/{id}/info` (prefers the square logo over the wide cover)
 - Fortresses → `/fortress/{id}`
 - Sherlocks → `/sherlocks/{id}/info`
 
-Square avatars (machines/challenges/Sherlocks) are shown as a thumbnail; wide
-Pro Lab/Fortress covers are shown as the large embed image. Lookups are cached
-for 6 hours.
+All types use a square embed thumbnail (top-right). Lookups are cached for 6 hours.
 
 ## Setup
 
@@ -76,7 +74,7 @@ for 6 hours.
 
 | Env var | Default | Purpose |
 |---------|---------|---------|
-| `NOTIFY_POLL_INTERVAL_MS` | `900000` (15 min) | How often (ms) to poll HTB for new owns |
+| `NOTIFY_POLL_INTERVAL_MS` | `1200000` (20 min) | How often (ms) to poll HTB for new owns |
 
 ## Notes / caveats
 
@@ -88,10 +86,3 @@ for 6 hours.
 - A flood cap of 20 announcements per member per poll prevents channel spam after
   big batches; capped-over events are not re-announced.
 
-## Known items / to investigate
-
-- **Pro Lab / Fortress "Points":** the embed shows the `points` value HTB returns
-  for each flag event (e.g. a Dante flag reports `points: 10`). The exact meaning
-  of these points for Pro Labs/Fortresses — and how they relate to overall XP —
-  needs more investigation. If they turn out to be misleading, the "Points" field
-  can be hidden for `prolab`/`fortress` types in `src/discord/own-embed.js`.

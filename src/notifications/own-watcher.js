@@ -12,11 +12,11 @@ import { buildOwnEmbed } from '../discord/own-embed.js';
 import { buildEmbedImage } from '../discord/embed-image.js';
 import { ensureGuild } from '../discord/ensure-guild.js';
 
-const POLL_INTERVAL_MS = Number(process.env.NOTIFY_POLL_INTERVAL_MS) || 900_000; // 15 min
+const POLL_INTERVAL_MS = Number(process.env.NOTIFY_POLL_INTERVAL_MS) || 1_200_000; // 20 min
 const MEMBER_CONCURRENCY = 4;
 // Safety cap so a member who owned a huge batch can't flood the channel.
-// Higher than the poll-every-90s default since a 15-min window can accumulate
-// more owns (e.g. a Pro Lab flag grind) that are all worth announcing.
+// A 20-min poll window can accumulate more owns (e.g. a Pro Lab flag grind)
+// that are all worth announcing.
 const MAX_POST_PER_MEMBER = 20;
 
 let intervalId = null;
@@ -178,7 +178,7 @@ async function poll(client, token) {
 
 /**
  * Start the own-notification watcher. Polls every NOTIFY_POLL_INTERVAL_MS
- * (default 90s) across all guilds that have enabled notifications.
+ * (default 20 min) across all guilds that have enabled notifications.
  *
  * @param {import('discord.js').Client} client
  * @param {string} token HTB app token

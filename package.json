@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/index.js",
     "deploy-commands": "node src/deploy-commands.js",
-    "install-browser": "npx playwright install chrome"
+    "install-browser": "npx playwright install chrome",
+    "showcase": "node scripts/showcase.mjs",
+    "showcase:discord": "node scripts/showcase-discord.mjs"
   },
   "engines": {
     "node": ">=18"

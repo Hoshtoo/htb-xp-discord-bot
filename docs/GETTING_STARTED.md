@@ -158,7 +158,7 @@ You should see something like:
 ```
 Logged in as YourBot#1234 (123…) — 1 guild(s)
 [scheduler] Period baseline sync enabled ...
-[notify] Own-notification watcher enabled (polling every 15 min)
+[notify] Own-notification watcher enabled (polling every 20 min)
 ```
 
 - `1 guild(s)` (or more) — good.
@@ -178,7 +178,7 @@ In Discord:
 ```
 
 That's it. From now on, new owns (machine user/root, challenge, Sherlock, Pro
-Lab flag, Fortress flag) post to the channel **automatically within ~15 minutes**.
+Lab flag, Fortress flag) post to the channel **automatically within ~20 minutes**.
 
 - All linked members are watched by default; anyone can `/notify optout`.
 - Existing history is silently seeded on first poll, so the channel won't get
