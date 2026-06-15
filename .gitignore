@@ -1,5 +1,6 @@
 node_modules/
 data/
+showcase/output/
 .env
 .env.local
 *.db
